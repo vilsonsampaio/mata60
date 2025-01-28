@@ -1,6 +1,5 @@
 const { Client } = require("pg");
-const fs = require("node:fs/promises");
-const path = require("node:path");
+const { MongoClient, ServerApiVersion } = require("mongodb");
 
 require("dotenv").config();
 
@@ -13,17 +12,28 @@ const pgClient = new Client({
   ssl: true,
 });
 
+const mongoClient = new MongoClient(process.env.MONGO_URL, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+});
+
+const formatDate = ({ data_criacao, data_atualizacao }) => ({
+  data_criacao: { $date: new Date(data_criacao).toISOString() },
+  data_atualizacao: data_atualizacao
+    ? { $date: new Date(data_atualizacao).toISOString() }
+    : null,
+});
+
 const init = async () => {
   try {
     await pgClient.connect();
     console.log("Conectado ao PostgreSQL.");
 
-    const formatDate = ({ data_criacao, data_atualizacao }) => ({
-      data_criacao: { $date: new Date(data_criacao).toISOString() },
-      data_atualizacao: data_atualizacao
-        ? { $date: new Date(data_atualizacao).toISOString() }
-        : null,
-    });
+    await mongoClient.connect();
+    console.log("Conectado ao MongoDB.");
 
     const discos = (
       await pgClient.query(`
@@ -174,28 +184,32 @@ const init = async () => {
       })
     );
 
-    await fs.writeFile(
-      path.join(__dirname, "data", "discos.json"),
-      JSON.stringify(discos, null, 2)
-    );
-    console.log("Discos exportados para JSON.");
+    console.log("\n");
+    const mongoDB = mongoClient.db(process.env.MONGO_DB);
+    await mongoDB.dropCollection("discos");
+    await mongoDB.dropCollection("usuarios");
+    await mongoDB.dropCollection("estoques");
+    console.log("Collections resetadas com sucesso!");
 
-    await fs.writeFile(
-      path.join(__dirname, "data", "usuarios.json"),
-      JSON.stringify(usuarios, null, 2)
-    );
-    console.log("Usuários exportados para JSON.");
+    console.log("\n");
+    await mongoDB.collection("discos").insertMany(discos);
+    console.log("Discos exportados para o MongoDB com sucesso!");
 
-    await fs.writeFile(
-      path.join(__dirname, "data", "estoques.json"),
-      JSON.stringify(estoques, null, 2)
-    );
-    console.log("Estoques exportados para JSON.");
+    await mongoDB.collection("usuarios").insertMany(usuarios);
+    console.log("Usuários exportados para o MongoDB com sucesso!");
+
+    await mongoDB.collection("estoques").insertMany(estoques);
+    console.log("Estoques exportados para o MongoDB com sucesso!");
   } catch (err) {
-    console.dir(err);
+    console.error(err);
   } finally {
+    console.log("\n");
+
     await pgClient.end();
     console.log("Conexão com PostgreSQL encerrada.");
+
+    await mongoClient.close();
+    console.log("Conexão com MongoDB encerrada.");
   }
 };
 
