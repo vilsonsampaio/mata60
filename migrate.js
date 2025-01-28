@@ -53,9 +53,9 @@ const init = async () => {
       ...formatDate(disco),
     }));
 
-    let usuarios = (
+    const usuarios = (
       await pgClient.query(`
-          SELECT 
+        SELECT 
             u.PK_id_usuario AS _id,
             u.nome,
             u.email,
@@ -89,7 +89,7 @@ const init = async () => {
       ) => {
         const userIndex = acc.findIndex((user) => user._id === usuario._id);
 
-        if (userIndex !== -1) {
+        if (userIndex !== -1 && wishlist_nome) {
           acc[userIndex].wishlists = acc[userIndex].wishlists || [];
           acc[userIndex].wishlists.push({
             nome: wishlist_nome,
@@ -105,16 +105,18 @@ const init = async () => {
 
         acc.push({
           ...usuario,
-          wishlists: [
-            {
-              nome: wishlist_nome,
-              discos_id: wishlist_discos_id.map(Number),
-              ...formatDate({
-                data_criacao: wishlist_data_criacao,
-                data_atualizacao: wishlist_data_atualizacao,
-              }),
-            },
-          ],
+          wishlists: wishlist_nome
+            ? [
+                {
+                  nome: wishlist_nome,
+                  discos_id: wishlist_discos_id.map(Number),
+                  ...formatDate({
+                    data_criacao: wishlist_data_criacao,
+                    data_atualizacao: wishlist_data_atualizacao,
+                  }),
+                },
+              ]
+            : null,
           ...formatDate(usuario),
         });
 
@@ -125,29 +127,29 @@ const init = async () => {
 
     const estoques = (
       await pgClient.query(`
-            SELECT 
-                e.PK_id_estoque as _id,
-                u.PK_id_usuario as id_usuario,
-                d.PK_id_disco as id_disco,
-                e.tipo,
-                e.disponivel_troca,
-                e.condicao,
-                e.data_criacao,
-                e.data_atualizacao,
-                a.nota AS nota,
-                a.comentario AS comentario,
-                a.data_criacao AS avaliacao_data_criacao,
-                a.data_atualizacao AS avaliacao_data_atualizacao
-            FROM 
-                tbl_estoque e
-            LEFT JOIN 
-                tbl_usuario u ON e.FK_id_usuario = u.PK_id_usuario
-            LEFT JOIN 
-                tbl_disco d ON e.FK_id_disco = d.PK_id_disco
-            LEFT JOIN 
-                tbl_avaliacao a ON e.PK_id_estoque = a.FK_id_estoque
-            ORDER BY 
-                id_usuario, id_disco;
+        SELECT 
+            e.PK_id_estoque as _id,
+            u.PK_id_usuario as id_usuario,
+            d.PK_id_disco as id_disco,
+            e.tipo,
+            e.disponivel_troca,
+            e.condicao,
+            e.data_criacao,
+            e.data_atualizacao,
+            a.nota AS nota,
+            a.comentario AS comentario,
+            a.data_criacao AS avaliacao_data_criacao,
+            a.data_atualizacao AS avaliacao_data_atualizacao
+        FROM 
+            tbl_estoque e
+        LEFT JOIN 
+            tbl_usuario u ON e.FK_id_usuario = u.PK_id_usuario
+        LEFT JOIN 
+            tbl_disco d ON e.FK_id_disco = d.PK_id_disco
+        LEFT JOIN 
+            tbl_avaliacao a ON e.PK_id_estoque = a.FK_id_estoque
+        ORDER BY 
+            id_usuario, id_disco;
       `)
     ).rows.map(
       ({
